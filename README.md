@@ -13,7 +13,7 @@ as its worked example.
 In Claude Code:
 
 ```
-/plugin marketplace add <this repo's git URL>
+/plugin marketplace add workadventure-maps/snes-homebrew-skill
 /plugin install snes-homebrew@snes-homebrew
 ```
 
