@@ -1,0 +1,8 @@
+{
+  "name": "snes-homebrew",
+  "version": "0.1.0",
+  "description": "Build SNES homebrew games in C with PVSnesLib: toolchain, VBlank and frame budgets, headless tests on snes9x, graphics and sound, 4 players with a Multitap, and publishing (GitHub Pages web player, WorkAdventure arcade).",
+  "author": { "name": "WorkAdventure" },
+  "license": "MIT",
+  "keywords": ["snes", "super-nintendo", "pvsneslib", "homebrew", "65816", "retro", "game-dev"]
+}

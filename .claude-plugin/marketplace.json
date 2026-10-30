@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "snes-homebrew",
+  "owner": {
+    "name": "WorkAdventure"
+  },
+  "metadata": {
+    "description": "Claude Code skill for building SNES homebrew games with PVSnesLib."
+  },
+  "plugins": [
+    {
+      "name": "snes-homebrew",
+      "source": "./",
+      "description": "Build SNES homebrew games in C with PVSnesLib, test them headless, and publish them."
+    }
+  ]
+}
