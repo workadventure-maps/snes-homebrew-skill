@@ -116,3 +116,17 @@ WorkAdventure arcade cabinet (cloud-game).
 - The Claude desktop app's browser has no WebGL, so EmulatorJS can't run there; test web pages with Playwright's
   headless Chromium and software WebGL (`references/testing.md`).
 - The snes9x core download is a nightly build, not pinned. If tests break with no code change, suspect the core.
+
+## Improving this skill
+
+This skill grows from real games. While you work, note every place where it was wrong, missing something or sent
+you the wrong way, and anything that cost a lot of time, with measurements when you have them. At the end of the
+task, tell the user what you would change in the skill and why. If they agree:
+
+- Edit the skill in its git repository, https://github.com/workadventure-maps/snes-homebrew-skill. A maintainer
+  may have a checkout linked as `~/.claude/skills/snes-homebrew`: follow the symlink to find it.
+- Keep game-specific choices (characters, rules, art style) out; they belong to the game's own repo.
+- The repo is public: no internal server addresses, private repositories or credentials.
+- Check with `claude plugin validate <repo>`, and bump `version` in `.claude-plugin/plugin.json` (installed
+  plugins only update to a new version).
+- Push to `main` if the user has write access and wants that; otherwise open a pull request.
