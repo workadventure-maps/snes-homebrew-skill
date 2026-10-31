@@ -81,6 +81,10 @@ so they get measured too.
 Tests don't see ugliness. After each visible change, take screenshots at the moments that matter, scale them 2x
 with nearest-neighbour, put several side by side in one image, look at it, and send it to the user.
 
+Screen coordinates: with no vertical scroll, the first visible line shows BG line 1, so whatever sits at BG y
+appears at screen y - 1 (Bombadventure's cell (cx, cy) is at screen (8 + 16 cx, 15 + 16 cy), not 16 + 16 cy).
+Keep that in mind when cropping cells out of screenshots or pasting art into them.
+
 ## Testing a web page that embeds the ROM
 
 EmulatorJS needs WebGL. The Claude desktop app's built-in browser has none, so drive headless Chromium through

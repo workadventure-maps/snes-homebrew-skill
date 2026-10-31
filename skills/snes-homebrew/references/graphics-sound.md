@@ -8,6 +8,8 @@
 - Input and the Multitap
 - Sound effects
 - Title screen from generated art
+- Tiles drawn by Codex, and choosing between versions
+- When a graphic needs more colors than its palette has
 
 ## A layout that works: Mode 1
 
@@ -150,3 +152,40 @@ arpeggios) as 8 kHz WAVs.
    (palettes 2-7). Text stays on BG3 with palettes 0-1, which is why the title can only use 6 palettes.
 
 Ask the user how generated art should be credited.
+
+## Tiles drawn by Codex, and choosing between versions
+
+Codex (`codex exec ... -C <dir> - < prompt.txt`) draws good pixel-art tiles when the brief is exact. Run several art
+directions in parallel, one directory each, and let the user pick from a comparison. The brief that worked for
+Bombadventure's explosion pieces:
+
+- Exact deliverable: one strip PNG (e.g. 112x16 = seven 16x16 pieces), the piece order and what each piece
+  connects to, a preview of a test layout at 8x, and the script if it drew in code.
+- Give it the current tiles and the floor tile as files, and say what is wrong with the current ones.
+- Every tile fully replaces its cell, so the floor must be drawn behind the art.
+- Joins: pieces that touch must continue across the edge. If the floor has edge lines (grout), edges can't be
+  identical: compare them treating the floor colors as the same, and say so in the brief.
+- At most 15 colors including the floor, distinct after rounding each channel down to a multiple of 8.
+- No anti-aliasing, blur or dithering noise; 16 px tiles need clear silhouettes.
+- Ask it to check all of this with a script before finishing, then check again yourself.
+
+To compare versions honestly, show them in the game, not on a white background:
+
+1. Take a real screenshot of a scene that uses the tiles (from the test frontend), and read from RAM which cell
+   shows which piece.
+2. Paste each candidate's pieces onto those cells. First paste the *current* pieces: the result must equal the
+   screenshot exactly (round both to 5 bits per channel), or the mapping is wrong.
+3. Put the versions side by side at 2x, each with its pieces enlarged underneath, and send the image.
+4. If the user mixes versions (one's ends, another's middles), joins and colors won't match: have Codex blend them
+   (keep each piece's design, adapt edges and palette), possibly in two color schemes to choose from.
+5. After integrating the winner, screenshot the same scene from the new ROM and diff it against the chosen
+   mockup: it should be 0 pixels.
+
+## When a graphic needs more colors than its palette has
+
+Don't squeeze it into a full palette. Give it its own tiles and its own BG palette: convert it as a separate
+image, upload its tiles right after the main tileset (`VRAM base + main tileset bytes / 2`, in words), compute its
+first tile number from the tileset size at run time (`(&tiles_tilend - &tiles_til) >> 5` for 4bpp), set its
+metatile entries with the new palette bits (`palette << 10`), and reload both tiles and palette wherever the
+screen is rebuilt (e.g. leaving the title screen). Add a test that screenshots the graphic and compares its
+pixels with the art file: a wrong palette or tile offset fails it, which nothing else would catch.

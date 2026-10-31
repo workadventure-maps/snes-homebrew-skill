@@ -88,7 +88,8 @@ built), view them, and send them to the user. Tests miss ugly.
 
 See `references/graphics-sound.md`: the BG mode and VRAM/CGRAM layout that worked, text on BG3, 32x32 sprites
 with the dynamic sprite engine, sound effects as BRR samples, and the title screen pipeline (generated art ->
-`mktitle.py` -> 6 palettes of 15 colors).
+`mktitle.py` -> 6 palettes of 15 colors). It also covers tiles drawn by Codex and how to let the
+user compare versions inside a real game screenshot, and what to do when a graphic needs its own palette.
 
 ### 7. Publish
 
