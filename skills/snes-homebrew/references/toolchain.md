@@ -162,6 +162,10 @@ code. What matters:
   (e.g. the BG-map index of every cell) instead of multiplying.
 - **Calls with arguments are expensive** (arguments pushed, reloaded from the stack in the callee). A 4-line
   helper compiled to 66 lines in the reference game. Inlining helpers as macros saved a little, not a lot.
+- **A small helper called in a loop is the worst case**: a 4-line collision test taking a pointer cost ~5
+  scanlines per call, so searching 20 rows for the landing row took ~100.
+- **`a || !b` is miscompiled**: with a negation as the right operand of `||`, the result is 0 whenever `a` is
+  true (`a && !b` and `a || b == 0` are fine). Write `b == 0`; `grep -n '|| *(*!'` finds the cases.
 - **Division and modulo call library routines.** Fine once per second (a timer display), not per cell.
 - `extern` across .c files works normally. PVSnesLib globals worth knowing: `snes_vblank_count` (frames since
   boot), `lag_frame_counter` (frames where the game missed VBlank), `snes_mplay5` (Multitap detected, after
@@ -178,7 +182,11 @@ Only after measuring (see SKILL.md step 4). The ABI, as used in `src/cells.asm` 
 - Return values go in `tcc__r0`. `tcc__r0`/`tcc__r1` are scratch: the compiler saves what it needs before a call.
 - To call C or another routine: push the arguments last-to-first (`pha` of 8-bit values), `jsl`, then pop them.
 - ROM tables need long addressing: `lda.l table,x`. There is no `lda long,y`, so move the index to X.
-- Branches reach ±127 bytes; use a `jmp` trampoline when a routine grows past that (wla-dx errors out).
+- Branches reach ±127 bytes (wla-dx errors out with "Too large distance"): invert the test and use the 16-bit
+  `brl` (`bcc +` / `brl @far` / `+`), or a `jmp` trampoline.
+- Scratch variables: declare them in C as u16 globals (`u16 dw_k, dw_base;`) and use them from assembly with
+  `.w` addressing. Pass u8 indices rather than pointers: the routine then indexes the C arrays directly
+  (`lda.w pmask,x`).
 - File header: `.include "hdr.asm"`, `.accu 16`, `.index 16`, `.16bit`, `.BASE $80` (FastROM), then
   `.SECTION ".name" SUPERFREE` ... `.ENDS`. Keep any constants shared with C in sync by hand, with a comment
   saying so.

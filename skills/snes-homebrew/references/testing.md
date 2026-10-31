@@ -70,6 +70,16 @@ A test must fail without the fix it covers. When fixing a bug, run the new test 
    record `(work_end - vbl_end) % 262` each frame outside transitions, and fail above 200 scanlines. Also assert
    `vbl_late == 0`. Print the busiest frame so changes in cost are visible in CI logs.
 
+Change all bots' input on the same frame: four actions in one frame is the worst case, and auto-repeat produces
+it in real play too.
+
+The emulator's frame can end in the middle of a routine that spans frames (a screen rebuild). Mark rows dirty
+before clearing them, so the VRAM check sees updates pending rather than a half-built map, and let the lag check
+accept the rebuild's frames: the lag counter moves before the state variable changes.
+
+Work RAM starts filled with $55 on snes9x: comparing whole arrays in tests catches state left uninitialized for
+empty player slots.
+
 Tests 2 and 3 only work together: the cost formula wraps at 262, so a frame of 419 lines reads as 157 and passes
 the budget. The lag counter is what catches it.
 

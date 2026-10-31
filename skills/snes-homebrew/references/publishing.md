@@ -59,8 +59,15 @@ rather than guessing. What holds whatever the deployment:
 
 - The game id is the ROM's file name without the extension; the cabinet page takes it as `game=<Name>`, with
   `players=4` for 4 players.
-- Players get slots in order of arrival (badges: P1 red, P2 blue, P3 green, P4 yellow); keys are arrows,
-  Z = A, X = B, Enter = Start. Keep HUD text away from the top corners, where the badges sit.
+- Players get slots in order of arrival (badges: P1 red, P2 blue, P3 green, P4 yellow). Keys, by position on a
+  QWERTY keyboard: arrows, Z X C V = A B X Y, A S = L R, Enter = Start, Shift = Select (AZERTY: W X C V, Q S).
+  Gamepads work by button position. Keep HUD text away from the top corners: the badge sits top-left, the
+  speaker and help icons top-right.
+- All players watch the same 256x224 picture, so every playfield must fit on it at once.
+- Slots change hands: leaving the cabinet area in WorkAdventure ends the user's session, and the
+  longest-waiting watcher takes over the slot, mid-game, on the same pad. The ROM can't tell: it sees a pad go
+  quiet, or someone new play it. Give idle players a rule (Bombadventure drops players who didn't touch the pad
+  during a round; a faster game can put a player out after 15 seconds without input).
 - The page sends input from `requestAnimationFrame`, so a background tab sends nothing: when testing several
   players from one machine, bring each tab to the front while it plays. Close test tabs afterwards: an open
   cabinet keeps a worker busy.

@@ -23,6 +23,15 @@ needs a Multitap in port 2), how players join, round and win rules, art sources 
 license, scope (prototype or polished), and where it will run (browser, arcade cabinet, real hardware). Record the
 answers in a DESIGN.md decision table so later sessions don't re-ask.
 
+For the WorkAdventure arcade cabinet, settle three more things before designing screens (publishing.md): all
+players share one 256x224 picture, so every playfield must fit on it at once; the keyboard gives each player a
+full pad (A B X Y, L R, Start, Select); and slots change hands mid-game when someone leaves, while the ROM only
+sees a pad go quiet, so decide what happens to an idle player.
+
+If the game belongs to a genre tied to one famous title, make a game of the genre, not a copy: its own name (no
+piece of the famous trademark), look, colors and rules. Some publishers defend their game's look in court, not
+just its name (Tetris Holding v. Xio, 2012).
+
 Check art rights before the first public push. Anything committed to a public repo stays in its history: removing
 it later means rewriting history and force-pushing. Third-party asset packs often allow use in games but forbid
 redistributing the raw files.
@@ -66,6 +75,11 @@ patterns that keep busy frames in budget.
 Write everything in C first. Measured on Bombadventure (4 players at full power, three random battles): an all-C
 version averaged 5% slower than the shipped one, with no dropped frames, but its busiest frames used 201-229 of
 the ~240 available scanlines against 152-164 with the per-cell routines in assembly.
+
+How much slower C is depends on the shape of the code. A falling-block game's board in C (a 4-row collision
+test called in a loop to find the landing row, rows copied cell by cell) cost ~160 scanlines per piece move and
+~250 to collapse cleared rows: a whole frame. Measure single actions early, not only a random battle: scanline
+probes around the steps of one action show where it goes (frame-budget.md).
 
 So: keep the frame-cost test (step 5) failing above a budget with headroom (200). When it fails, first spread the
 work over several frames (queues, one heavy event per frame). Move a routine to assembly only when it is a
@@ -112,6 +126,10 @@ WorkAdventure arcade cabinet (cloud-game).
   already does heavy work.
 - Initialized non-const globals don't work as variables: the compiler puts them in ROM. Initialize RAM in code.
 - No 32-bit shifts in C (link error on `tcc__ashldi3`).
+- 816-tcc miscompiles a negation right of `||`: `a || !b` gives 0 when `a` is true. Write `b == 0` instead.
+  Start did nothing on a title screen until this was found.
+- `padsDown()` is computed once per VBlank, so a frame that runs late loses presses. Compare `padsCurrent()`
+  with the value the game saw last frame instead (graphics-sound.md).
 - Switching between two full screens (title and arena) can't go through the per-frame DMA budget: turn the screen
   off, DMA everything, turn it back on.
 - The Claude desktop app's browser has no WebGL, so EmulatorJS can't run there; test web pages with Playwright's

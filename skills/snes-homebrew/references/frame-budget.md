@@ -43,6 +43,10 @@ void measure_vblank(void)       // right after the VBlank DMAs
 `work_end = scanline()` just before `WaitForVBlank()`. The frame's CPU cost is
 `(work_end - vbl_end) mod 262` scanlines. The tests read these three variables (testing.md).
 
+To find where a busy frame goes, put probes around the steps of one action (`u16 prof[8];`,
+`prof[0] = scanline();` ...) and read `(prof[b] - prof[a]) % 262` from a test. Each probe costs about a scanline;
+remove them afterwards.
+
 That formula wraps: a frame that takes 419 lines reads as 157. It is only meaningful on frames without lag, so a
 budget test must always also assert that `lag_frame_counter` didn't move.
 
@@ -70,9 +74,15 @@ started its sound in one frame (54 + 44 scanlines).
   pushes changed cells on a redraw queue; a fixed number (8) are drawn per frame. A big blast spreads its drawing
   over a few frames, which nobody can see.
 - **One heavy event per frame.** At most one bomb explodes per frame; a chain reaction ripples one bomb per frame.
+- **Cap per-player actions per frame.** With four players, anything a player does can happen four times in one
+  frame, and auto-repeat lines players up. A falling-block game allowed at most 3 piece locks, spawns or redraws
+  per frame; the others waited a frame, which nobody sees. Test it with all players acting on the same frame.
 - **Defer sound starts** to a frame without a heavy event: `spcPlaySound()` costs about 40 scanlines.
 - **Text is slow to draw in C** (a 32-tile row is a 32-iteration loop). Draw messages on frames between heavy
-  events (Bombadventure's "SUDDEN DEATH!" message waits for a frame between two falling walls).
+  events (Bombadventure's "SUDDEN DEATH!" message waits for a frame between two falling walls; a result message
+  can wait for the frame after the one that ended the match).
+- **Static sprite frames** when they fit in VRAM: PVSnesLib's dynamic engine costs ~24 scanlines a frame for
+  four 32x32 sprites (graphics-sound.md).
 - **Rebuilding a level** takes several frames: do it while a static screen (results) is showing.
 
 ## C or assembly: the measurements

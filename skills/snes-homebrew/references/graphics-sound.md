@@ -104,6 +104,30 @@ oamInitDynamicSpriteEndFrame();
 Each frame change uploads 512 bytes, so cap uploads per frame (2 in the reference game) and let the others catch
 up next frame.
 
+### When every frame fits in VRAM: static frames
+
+The dynamic engine costs ~6 scanlines per 32x32 sprite on every frame (about 24 for four players), plus frame
+uploads in VBlank. Sprite VRAM holds 32 frames of 32x32 (16 KB with the default name tables): when every frame
+the game uses fits, load them once and write OAM directly. PVSnesLib copies `oamMemory` to OAM in VBlank.
+
+```c
+oamInit();
+oamInitGfxAttr(0x0000, OBJ_SIZE16_L32);
+dmaCopyVram(&p1_til, 0x0000, 4096);      // 8 frames: gfx4snes -s 32 output is VRAM-ready, 4 frames per band
+dmaCopyVram(&p2_til, 0x0800, 4096);      // ... up to $1FFF
+oamMemory[512] = 0xAA;                   // high table: entries 0..3 large, x < 256
+
+// frame f of the sheet loaded at tile `base` (0, 128, 256, 384 above): base + (f >> 2) * 64 + (f & 3) * 4
+void put_sprite(u8 id, u8 x, u8 y, u16 tile, u8 pal)
+{
+    u8 i = id << 2;
+    oamMemory[i] = x;
+    oamMemory[i + 1] = y;                // 224 hides a 32x32 sprite
+    oamMemory[i + 2] = tile;
+    oamMemory[i + 3] = OBJ_PRIO(2) | OBJ_PAL(pal) | (tile >> 8);
+}
+```
+
 For characters on a 16 px grid, a 32x32 sprite at full size is too big; the reference game scales 32x32
 character art to 21x21 (2/3) inside the 32x32 frame, feet near the bottom, head overlapping the row above. The
 title screen uses extra full-size frames in the same sheet.
@@ -114,8 +138,12 @@ title screen uses extra full-size frames in the same sheet.
 detectMPlay5();
 npads = snes_mplay5 ? 4 : 2;      // P1 on port 1, P2-P4 on a Multitap in port 2
 keys = padsCurrent(p);            // held: KEY_LEFT, KEY_A, KEY_START...
-down = padsDown(p);               // pressed this frame
+down = keys & ~keys_before[p];    // pressed since the game last looked
+keys_before[p] = keys;
 ```
+
+Don't use `padsDown()`: PVSnesLib computes it at each VBlank, so when a frame runs late, the next VBlank clears
+the press before the game sees it (a test caught a hard drop that never happened).
 
 Accept every face button (A, B, X, Y) for the main action: arcade and browser players have different mappings.
 Track whether each player touched their pad during a round, to drop idle players from the next one.
