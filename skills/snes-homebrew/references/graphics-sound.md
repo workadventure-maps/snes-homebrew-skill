@@ -4,7 +4,7 @@
 - A layout that works: Mode 1
 - Text on BG3
 - 16x16 cells on a BG layer
-- Sprites: 32x32 with the dynamic sprite engine
+- Sprites: 32x32 with the dynamic sprite engine (and smaller characters: redraw, don't shrink)
 - Input and the Multitap
 - Sound effects
 - Title screen from generated art
@@ -131,6 +131,41 @@ void put_sprite(u8 id, u8 x, u8 y, u16 tile, u8 pal)
 For characters on a 16 px grid, a 32x32 sprite at full size is too big; the reference game scales 32x32
 character art to 21x21 (2/3) inside the 32x32 frame, feet near the bottom, head overlapping the row above. The
 title screen uses extra full-size frames in the same sheet.
+
+### Smaller characters: redraw, don't shrink
+
+Shrinking pixel art automatically blurs it: a smooth resize plus color reduction smeared Bombadventure's eyes,
+lost the dark outline and turned hair into mush. Crisper automatic methods don't fix it either: nearest-pixel drops
+or doubles details (uneven eyes), and taking each area's dominant color is lumpy with no outline. A human would
+redraw the frames by hand, pixel by pixel; Codex does that well. What worked:
+
+- One Codex run per character, in parallel, and two art directions to let the user choose: *faithful* (same
+  drawing and colors, simplified) and *bold* (full dark outline, flat colors, bigger head). The faithful one won:
+  the bold one read best but lost what makes each character recognizable (hair shapes, pigtails).
+- Give it the full-size sheet (rows = directions, columns = walk steps), the current shrunk frames, and a crisp
+  automatic shrink as a starting point.
+- Deliverable: the same layout at the target size (63x84 for 12 frames of 21x21), alpha only 0 or 255, an 8x
+  preview next to the originals, and its script.
+- Constraints: feet on the bottom row and the same horizontal center in every frame (no jitter between walk
+  frames), at most 15 colors taken from the original (distinct after 5-bit rounding), no blended colors, the
+  player's identifying outfit color kept, legs alternating in the walk cycle. Ask for a self-check script, then
+  check the same things yourself.
+- Hand-drawn frames come out with a perfectly still upper body; the originals bobbed by a pixel. Mention it to
+  the user rather than deciding.
+- Codex runs count against the user's ChatGPT plan: eight parallel runs of about ten minutes hit its usage limit
+  just as they finished.
+
+To compare versions, build one ROM per version (a scratch copy of the repo with the sprite files swapped) and
+screenshot the same moment: each player standing and mid-step, one per direction, cropped and enlarged 4x, next
+to today's version.
+
+**Palette:** when hand-drawn frames share a sprite palette with other frames (the full-size title frames), make
+the hand-drawn frames' colors the palette exactly and map the other frames to the nearest of them. Re-quantizing
+the whole sheet would shift the colors that were picked by hand.
+
+**Test:** screenshot the players in a known pose and compare every opaque pixel of their frame with the file.
+Measure the on-screen offset once (a frame placed at (5, 10) inside the 32x32 sprite appeared at OAM position +
+(5, 10)). A swapped palette or a wrong frame fails it.
 
 ## Input and the Multitap
 
