@@ -66,8 +66,9 @@ rather than guessing. What holds whatever the deployment:
 - All players watch the same 256x224 picture, so every playfield must fit on it at once.
 - Slots change hands: leaving the cabinet area in WorkAdventure ends the user's session, and the
   longest-waiting watcher takes over the slot, mid-game, on the same pad. The ROM can't tell: it sees a pad go
-  quiet, or someone new play it. Give idle players a rule (Bombadventure drops players who didn't touch the pad
-  during a round; a faster game can put a player out after 15 seconds without input).
+  quiet, or someone new play it. Drop players who didn't touch their pad during a whole round from the next one,
+  until they press Start. Don't put a player out mid-round after some seconds without input: a falling-block
+  game tried 15 seconds, and in play-testing it felt like a bug.
 - The page sends input from `requestAnimationFrame`, so a background tab sends nothing: when testing several
   players from one machine, bring each tab to the front while it plays. Close test tabs afterwards: an open
   cabinet keeps a worker busy.
