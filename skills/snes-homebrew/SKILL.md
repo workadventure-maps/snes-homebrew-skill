@@ -1,6 +1,6 @@
 ---
 name: snes-homebrew
-description: Build original Super Nintendo (SNES / Super Famicom) homebrew games as real ROMs, in C with PVSnesLib plus a little 65816 assembly: toolchain setup, project layout, VBlank and frame-time budgets, headless tests on the snes9x libretro core, sprites, text, title screens, sound, 4 players with a Multitap, and publishing (GitHub Actions, a playable GitHub Pages site, the WorkAdventure arcade cabinet). Use this skill whenever the user wants to make, extend, debug, test or ship a SNES game or .sfc ROM, or asks what it would take to build one, even if they don't mention PVSnesLib.
+description: Build original Super Nintendo (SNES / Super Famicom) homebrew games as real ROMs, in C with PVSnesLib plus a little 65816 assembly: toolchain setup, project layout, VBlank and frame-time budgets, headless tests on the snes9x libretro core, sprites, text, title screens, sound effects and music, 4 players with a Multitap, and publishing (GitHub Actions, a playable GitHub Pages site, the WorkAdventure arcade cabinet). Use this skill whenever the user wants to make, extend, debug, test or ship a SNES game or .sfc ROM, or asks what it would take to build one, even if they don't mention PVSnesLib.
 ---
 
 # SNES homebrew games
@@ -29,8 +29,8 @@ full pad (A B X Y, L R, Start, Select); and slots change hands mid-game when som
 sees a pad go quiet, so decide what happens to an idle player.
 
 If the game belongs to a genre tied to one famous title, make a game of the genre, not a copy: its own name (no
-piece of the famous trademark), look, colors and rules. Some publishers defend their game's look in court, not
-just its name (Tetris Holding v. Xio, 2012).
+piece of the famous trademark), look, colors, music and rules. Some publishers defend their game's look in
+court, not just its name (Tetris Holding v. Xio, 2012).
 
 Check art rights before the first public push. Anything committed to a public repo stays in its history: removing
 it later means rewriting history and force-pushing. Third-party asset packs often allow use in games but forbid
@@ -101,7 +101,8 @@ built), view them, and send them to the user. Tests miss ugly.
 ### 6. Graphics, text, sound, title screen
 
 See `references/graphics-sound.md`: the BG mode and VRAM/CGRAM layout that worked, text on BG3, 32x32 sprites
-with the dynamic sprite engine, sound effects as BRR samples, and the title screen pipeline (generated art ->
+with the dynamic sprite engine, sound effects as BRR samples, music (SNESMOD modules, one made from a
+public-domain score, music that follows the game), and the title screen pipeline (generated art ->
 `mktitle.py` -> 6 palettes of 15 colors). It also covers tiles and sprites redrawn by Codex (never shrink pixel
 art automatically: it blurs), how to let the user compare versions inside the real game, and what to do when a
 graphic needs its own palette.
@@ -135,6 +136,14 @@ WorkAdventure arcade cabinet (cloud-game).
   off, DMA everything, turn it back on.
 - The Claude desktop app's browser has no WebGL, so EmulatorJS can't run there; test web pages with Playwright's
   headless Chromium and software WebGL (`references/testing.md`).
+- Music (graphics-sound.md): `spcPlaySound` waits for the driver to take every queued command, and starting a
+  module keeps it busy 8-19 frames, so a sound started then freezes the game. Start effects only when
+  `spc_fread == spc_fwrite`.
+- Loading a module at boot adds ~35 frames: tests wait for the title state, never a fixed number of frames.
+- A copy of PVSnesLib's `spcBoot` must not turn its `$4200` write into a real one: that turns NMI off and
+  `WaitForVBlank` hangs.
+- When the game picks the next pattern, every pattern must start each channel with a note or a note-off, or a
+  note rings forever. Test it on the .it file.
 - The snes9x core download is a nightly build, not pinned. If tests break with no code change, suspect the core.
 
 ## Improving this skill

@@ -7,6 +7,7 @@
 - Sprites: 32x32 with the dynamic sprite engine (and smaller characters: redraw, don't shrink)
 - Input and the Multitap
 - Sound effects
+- Music: SNESMOD modules (trackers, a module from a public-domain score, music that follows the game)
 - Title screen from generated art
 - Tiles drawn by Codex, and choosing between versions
 - When a graphic needs more colors than its palette has
@@ -199,6 +200,177 @@ spcSetSoundTableEntry(&sfx_table[0]);
 One effect plays at a time. Keep a single "next sound" slot with priorities (a death beats a bomb drop) and
 start it on a quiet frame. Placeholder effects can be synthesized in Python (sweeps, noise bursts, square-wave
 arpeggios) as 8 kHz WAVs.
+
+## Music: SNESMOD modules
+
+PVSnesLib plays music with SNESMOD, a driver for the sound CPU (SPC700), from Impulse Tracker modules that
+`smconv` packs into a soundbank. The worked example is a falling-block game whose music follows the game,
+https://github.com/workadventure-maps/cubicle: `tools/mkmod.py`, `src/music.asm`, `snesmod/sm_spc.asm` (changed
+lines marked), `update_music` and `update_sound` in `src/main.c`, and the `music` and `patterns_start_silent`
+tests in `tests/smoke.py`.
+
+### What SNESMOD plays
+
+Only Impulse Tracker `.it` files. The rules are in `pvsneslib/pvsneslib_snesmod.txt` in the PVSnesLib download;
+the ones that matter most:
+
+- Instrument mode, and every note names a defined instrument (an undefined one breaks the driver).
+- 8 channels at most, and streamed sound effects overwrite channel 8: keep the music on channels 1-7.
+- All samples fit in ~58 KB after BRR compression (16-bit samples shrink to 9/32), minus 2 KB per echo delay
+  step and the effects' stream region. Loop lengths are a multiple of 16 (others get unrolled or resampled).
+- Linear slides, "Old Effects" off, one sustain node per envelope, no New Note Actions, no pattern loop (`SBx`),
+  `Cxx` only as `C00`.
+- Echo is set in the song message: a `[[SNESMOD]]` line, then commands such as `edl 3`, `efb 40`,
+  `evol 24 24`, `eon 1 2 3`.
+
+Trackers on Linux: Schism Tracker (`apt install schism`) saves .it natively. OpenMPT, the best .it editor, runs
+under Wine; save with File > Compatibility Export. MilkyTracker only saves .xm; Furnace and Renoise can't export
+.it.
+
+```make
+AUDIOFILES := music/song.it                    # before the include; several files make one soundbank
+export SOUNDBANK := music/soundbank
+include ${PVSNESLIB_HOME}/devkitsnes/snes_rules
+SMCONVFLAGS := -s -o $(SOUNDBANK) -V -b 5      # soundbank in ROM bank 5
+$(SRC)/main.ps: $(SOUNDBANK).asm               # main.c includes the generated soundbank.h
+```
+
+```c
+#include "music/soundbank.h"                   // MOD_SONG for music/song.it; gitignore music/soundbank.*
+extern char SOUNDBANK__;
+
+spcBoot();
+spcAllocateSoundRegion(12);                    // the effects' stream, as above
+spcSetBank(&SOUNDBANK__);
+spcLoad(MOD_SONG);                             // ~35 frames for a 22 KB module: do it at boot
+spcPlay(0);                                    // from order 0; spcStop(); spcGetMusicPosition() = current order
+```
+
+### A module from a public-domain score
+
+The Mutopia Project (mutopiaproject.org) has public-domain music typeset with MIDI files. Each piece has its own
+license line (public domain, or Creative Commons asking for credit): check it, and credit as it asks.
+
+A Python script can arrange the MIDI and write the .it itself, with no tracker needed to start; `tools/mkmod.py`
+in the example (~280 lines, its own MIDI reader) does it this way:
+
+- Speed 6 with a 16th note per row: the IT tempo then equals the score's BPM.
+- Synthesized samples, 16-bit: single cycles of 32 samples (pulse, square, a few odd harmonics for a soft tone),
+  looped whole, and a Karplus-Strong pluck for the bass. Shape each instrument with a volume envelope.
+- Each hand of a piano score gets 3 channels; drop octave doublings when a chord has more notes than that. Put
+  a note-off (`===`) where each note ends.
+- Grace notes become an arpeggio (`Jxy`) on the row before the note they lead to; triplets use a note delay
+  (`SDx`).
+- Commit the .it: once someone edits it in a tracker it is the source, and rerunning the script starts over.
+
+### Hearing it
+
+Tests can show that music plays, not that it sounds right: let the user listen. A ROM that only plays the module
+is enough (same Makefile, no screen setup):
+
+```c
+int main(void)
+{
+    spcBoot();
+    spcSetBank(&SOUNDBANK__);
+    spcLoad(MOD_SONG);
+    spcPlay(0);
+    while (1) { spcProcess(); WaitForVBlank(); }
+    return 0;
+}
+```
+
+Record it headless and send the MP3:
+
+```python
+s = Snes('listen.sfc')
+s.audio = []                                   # stereo int16 at 32040 Hz
+s.run(60 * 90)                                 # 90 seconds
+open('song.raw', 'wb').write(b''.join(s.audio))
+```
+
+```bash
+ffmpeg -f s16le -ar 32040 -ac 2 -i song.raw song.mp3
+```
+
+The driver plays about 2% slower than a tracker at the same tempo.
+
+### Music that follows the game: an altered driver
+
+The stock driver can't follow the game: pattern `Txx` is clamped to 80-200 BPM, no command sets the tempo or
+picks the next pattern, and `spcPlay` resets the tempo to the module header's. What worked:
+
+1. Get the driver source from PVSnesLib's source repository at the tag of your release
+   (`snesmod/sm_spc_wla.asm`). Build it with `wla-spc700` and `wlalink -b`; the stock source gives PVSnesLib's
+   own driver byte for byte, which proves the build before you change anything.
+2. It is zlib-licensed: keep the notice, say at the top that it is altered and how, and mark the changed lines.
+3. Add commands to `CommandTable` after the last one; each reads its argument from `SPC_PORT3` and ends with
+   `jmp !CommandRet`. A tempo command calls `Module_ChangeTempo`, which stops timer 0: restart it
+   (`mov SPC_CONTROL, #%00000111`) if `mod_active`. Its timer value is $5000 / BPM in 8 bits, so 81-255 BPM.
+   A "next order" command stores the order in a new variable; `Module_OnTick` uses it where a pattern ends
+   (`_adv_pos`) instead of the next order, and `Module_Start` clears it.
+4. The driver code must end below `MODULE` ($1A00). With two commands added it ended at $19C1.
+5. PVSnesLib links its own driver inside `libc.obj`, so it can't be replaced. Copy `spcBoot` (PVSnesLib
+   `source/snesmodwla.asm`) into your own .asm, uploading your binary (`.incbin "snesmod/sm_spc.bin" FSIZE
+   DRIVER_SIZE`) and clearing the same variables. Drop its `$4200` write (see the trap below). Every other `spc*`
+   function works with the new driver.
+6. Send the new commands through PVSnesLib's queue, so they leave in order with the others on `spcProcess()`:
+
+```asm
+; void spcSetTempo(u8 bpm)
+spcSetTempo:
+	php
+	phb
+	sep	#$20
+	lda	#$0
+	pha
+	plb			; data bank 0, as QueueMessage expects
+	lda	6,s
+	sta.w	spc1+1		; the argument goes to port 3
+	lda	#CMD_TEMPO	; $0C, the new command's index
+	jml	QueueMessage	; queues, then plb/plp/rtl
+```
+
+```make
+snesmod/sm_spc.bin: snesmod/sm_spc.asm snesmod/sm_spc.link    # sm_spc.link: "[objects]" then "sm_spc.obj"
+	cd snesmod && $(PVSNESLIB_HOME)/devkitsnes/bin/wla-spc700 -o sm_spc.obj sm_spc.asm && \
+		$(PVSNESLIB_HOME)/devkitsnes/bin/wlalink -b sm_spc.link sm_spc.bin
+$(SRC)/music.obj: snesmod/sm_spc.bin
+```
+
+In the game: send the tempo right after every `spcPlay`. To jump between pattern groups, re-queue the next order
+every frame while the last pattern of a group plays, so the choice uses the game's state at the very end.
+
+Traps:
+
+- **The `$4200` write in `spcBoot`.** It runs with the caller's data bank ($7E), so it writes a WRAM byte and
+  NMI stays on. Made a real (long) write, it turns NMI off and `WaitForVBlank` hangs. The upload doesn't need it.
+- **A sound effect can freeze the game.** `spcPlaySound` first waits until the driver has taken every queued
+  command, and starting a module keeps the driver busy 8-19 frames (it clears the echo buffer and waits). Start
+  an effect only when the queue is empty: `extern u8 spc_fread, spc_fwrite;` then `spc_fread == spc_fwrite`.
+- **Patterns played out of order.** A note still on at the end of one pattern rings until its channel plays
+  again. When the game picks patterns, every pattern must start each channel with a note or a note-off. A test
+  reads the first row of each packed pattern in the .it:
+
+```python
+def patterns_start_silent(path, channels=range(6)):
+    d = open(path, 'rb').read()
+    orders, ins, smp, pats = struct.unpack('<4H', d[0x20:0x28])
+    table = 0xC0 + orders + 4 * (ins + smp)
+    for k in range(pats):
+        p, mask, notes = struct.unpack('<I', d[table + 4 * k:table + 4 * k + 4])[0] + 8, {}, set()
+        while d[p]:                            # first row: channel byte, mask, then the fields
+            ch = (d[p] & 0x7f) - 1
+            if d[p] & 0x80:
+                p += 1
+                mask[ch] = d[p]
+            m = mask[ch]
+            if m & 1:
+                notes.add(ch)
+            p += 1 + (m & 1) + bool(m & 2) + bool(m & 4) + 2 * bool(m & 8)
+        missing = [c + 1 for c in sorted(set(channels) - notes)]   # tracker numbering
+        assert not missing, f'pattern {k}: channels {missing} may hold a note'
+```
 
 ## Title screen from generated art
 

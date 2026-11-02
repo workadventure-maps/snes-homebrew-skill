@@ -22,6 +22,7 @@ ram = s.wram()                    # 128 KB work RAM, bytes
 vram = s.vram()                   # 64 KB video RAM
 s.poke_wram(addr, [1, 2])         # set up a situation directly
 s.loudness                        # peak audio sample of the last frame (0 = silence)
+s.audio = []                      # record from now on: stereo int16 PCM chunks at 32040 Hz
 s.screenshot('shot.png')
 SYM = symbols('mygame.sym')       # {'variable': wram offset} for WRAM labels
 ```
